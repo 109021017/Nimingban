@@ -18,9 +18,13 @@ package com.hippo.nimingban;
 
 import android.app.ActivityManager;
 import android.app.Application;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
 import android.os.Debug;
 import android.support.annotation.NonNull;
 import android.util.Log;
@@ -33,6 +37,7 @@ import com.hippo.nimingban.client.NMBDns;
 import com.hippo.nimingban.client.NMBRequest;
 import com.hippo.nimingban.client.ac.data.ACCdnPath;
 import com.hippo.nimingban.client.data.ACSite;
+import com.hippo.nimingban.client.NMBInterceptor;
 import com.hippo.nimingban.network.HttpCookieDB;
 import com.hippo.nimingban.network.HttpCookieWithId;
 import com.hippo.nimingban.network.SimpleCookieStore;
@@ -83,8 +88,6 @@ public final class NMBApplication extends Application
 
     private boolean mConnectedWifi;
 
-    private boolean mHasInitTCAgent;
-
     @Override
     public void onCreate() {
         super.onCreate();
@@ -109,7 +112,14 @@ public final class NMBApplication extends Application
         // Remove temp file
         FileUtils.deleteContent(NMBAppConfig.getTempDir());
 
+        // Check network state
         updateNetworkState(this);
+        registerReceiver(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                updateNetworkState(context);
+            }
+        }, new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
 
         // Theme
         setTheme(Settings.getDarkTheme() ? R.style.AppTheme_Dark : R.style.AppTheme);
@@ -203,6 +213,11 @@ public final class NMBApplication extends Application
         if (oldVersionCode < 42) {
             Settings.putSetAnalysis(false);
             Settings.putAnalysis(false);
+        }
+
+        // Fix cookie lost when save to file in 1.2.29 and below
+        if (oldVersionCode < 44) {
+            NMBApplication.getSimpleCookieStore(this).fixLostCookiePath();
         }
     }
 
@@ -309,6 +324,7 @@ public final class NMBApplication extends Application
                     .writeTimeout(15, TimeUnit.SECONDS)
                     .dns(new NMBDns())
                     .cookieJar(new CookieDBJar(getSimpleCookieStore(context)))
+                    .addInterceptor(new NMBInterceptor())
                     .build();
         }
         return application.mOkHttpClient;

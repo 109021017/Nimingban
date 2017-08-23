@@ -16,15 +16,15 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 23
-    buildToolsVersion "23.0.3"
+    compileSdkVersion 25
+    buildToolsVersion "25.0.0"
 
     defaultConfig {
         applicationId "com.hippo.nimingban"
         minSdkVersion 14
-        targetSdkVersion 23
-        versionCode 42
-        versionName "1.2.28"
+        targetSdkVersion 25
+        versionCode 48
+        versionName "1.2.34"
         vectorDrawables.useSupportLibrary = true
         resConfigs "zh", "zh-rCN"
         ndk {
@@ -62,23 +62,24 @@ clean {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile project(':android-advancedrecyclerview')
     compile project(':beerbelly')
     compile project(':conaco')
     compile project(':easyrecyclerview')
     compile project(':photoview')
-    compile project(':swipebacklayout')
     compile project(':yorozuya')
     compile 'com.alibaba:fastjson:1.1.52.android'
-    compile 'com.android.support:appcompat-v7:23.4.0'
-    compile 'com.android.support:cardview-v7:23.4.0'
-    compile 'com.android.support:recyclerview-v7:23.4.0'
+    compile 'com.android.support:appcompat-v7:25.0.1'
+    compile 'com.android.support:cardview-v7:25.0.1'
+    compile 'com.android.support:recyclerview-v7:25.0.1'
+    compile 'com.github.seven332:advrecyclerview:0.10.0'
     compile 'com.github.seven332:drawerLayout:0.1.0'
-    compile 'com.github.seven332:image:0.1.8-jpeg-png-gif'
+    compile 'com.github.seven332:image:877cb27e729db592f7f238838583ca74202baa67'
+    compile 'com.github.seven332:okhttp:3.4.2'
     compile 'com.github.seven332:refreshlayout:0.1.0'
     compile 'com.github.seven332:ripple:0.1.1'
-    compile 'com.github.seven332:unifile:0.1.3'
+    compile 'com.github.seven332:swipeback:0.1.1'
+    compile 'com.github.seven332:unifile:0.1.4'
     compile 'org.ccil.cowan.tagsoup:tagsoup:1.2.1'
     compile 'org.greenrobot:greendao:2.2.0'
-    compile 'org.jsoup:jsoup:1.9.1'
+    compile 'org.jsoup:jsoup:1.10.1'
 }

@@ -44,6 +44,7 @@ import android.text.style.TextAppearanceSpan;
 import android.text.style.TypefaceSpan;
 import android.text.style.URLSpan;
 import android.text.style.UnderlineSpan;
+import android.util.Log;
 
 import org.ccil.cowan.tagsoup.HTMLSchema;
 import org.ccil.cowan.tagsoup.Parser;
@@ -56,6 +57,7 @@ import org.xml.sax.XMLReader;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.text.ParseException;
 import java.util.HashMap;
 import java.util.Locale;
 
@@ -63,7 +65,7 @@ import java.util.Locale;
  * This class processes HTML strings into displayable styled text.
  * Not all HTML tags are supported.
  */
-public class Html {
+public final class Html {
 
     /**
      * Retrieves images for HTML &lt;img&gt; tags.
@@ -116,7 +118,7 @@ public class Html {
      * a) be preloaded by the zygote, or b) not loaded until absolutely
      * necessary.
      */
-    private static class HtmlParser {
+    private static final class HtmlParser {
         private static final HTMLSchema schema = new HTMLSchema();
     }
 
@@ -432,15 +434,17 @@ public class Html {
 
 class HtmlToSpannedConverter implements ContentHandler {
 
+    private static final String TAG = HtmlToSpannedConverter.class.getSimpleName();
+
     private static final float[] HEADER_SIZES = {
             1.5f, 1.4f, 1.3f, 1.2f, 1.1f, 1f,
     };
 
-    private String mSource;
-    private XMLReader mReader;
-    private SpannableStringBuilder mSpannableStringBuilder;
-    private Html.ImageGetter mImageGetter;
-    private Html.TagHandler mTagHandler;
+    private final String mSource;
+    private final XMLReader mReader;
+    private final SpannableStringBuilder mSpannableStringBuilder;
+    private final Html.ImageGetter mImageGetter;
+    private final Html.TagHandler mTagHandler;
 
     public HtmlToSpannedConverter(
             String source, Html.ImageGetter imageGetter, Html.TagHandler tagHandler,
@@ -707,11 +711,13 @@ class HtmlToSpannedConverter implements ContentHandler {
                             where, len,
                             Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
                 } else {
-                    int c = getHtmlColor(f.mColor);
-                    if (c != -1) {
+                    try {
+                        int c = getHtmlColor(f.mColor);
                         text.setSpan(new ForegroundColorSpan(c | 0xFF000000),
                                 where, len,
                                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    } catch (ParseException e) {
+                        // Ignore
                     }
                 }
             }
@@ -891,42 +897,45 @@ class HtmlToSpannedConverter implements ContentHandler {
 
     /**
      * Parse the color string, and return the corresponding color-int.
-     * If the string cannot be parsed, throws an IllegalArgumentException
-     * exception. Supported formats are:
+     * If the string cannot be parsed, return -1. Supported formats are:
      * #RRGGBB
      * #AARRGGBB
      * rgb(255, 255, 255)
      * or color name
      */
     @ColorInt
-    public static int getHtmlColor(@NonNull String colorString) {
+    public static int getHtmlColor(@NonNull String colorString) throws ParseException {
+        colorString = colorString.trim();
+        try {
+            return getHtmlColorInternal(colorString);
+        } catch (NumberFormatException e) {
+            Log.e(TAG, "Unknown color: " + colorString);
+            throw new ParseException("Unknown color: " + colorString, 0);
+        }
+    }
+
+    private static int getHtmlColorInternal(@NonNull String colorString)
+            throws NumberFormatException, ParseException {
         if (colorString.charAt(0) == '#') {
             // Use a long to avoid rollovers on #ffXXXXXX
             long color = Long.parseLong(colorString.substring(1), 16);
-            if (colorString.length() == 7) {
-                // Set the alpha value
-                color |= 0x00000000ff000000;
-            } else if (colorString.length() != 9) {
-                throw new IllegalArgumentException("Unknown color: " + colorString);
-            }
+            color |= 0x00000000ff000000;
             return (int)color;
         } else if (colorString.startsWith("rgb(") && colorString.endsWith(")")) {
             String str = colorString.substring(4, colorString.length() - 1);
             String[] colors = str.split("[\\s]*,[\\s]*");
             if (colors.length == 3) {
-                try {
-                    return Color.argb(0xff, Integer.valueOf(colors[0]), Integer.valueOf(colors[1]), Integer.valueOf(colors[2]));
-                } catch (NumberFormatException e) {
-                    throw new IllegalArgumentException("Unknown color: " + colorString);
-                }
+                return Color.argb(0xff, Integer.valueOf(colors[0]),
+                        Integer.valueOf(colors[1]), Integer.valueOf(colors[2]));
             }
         } else {
-            Integer color = sColorNameMap.get(colorString.toLowerCase(Locale.ROOT));
+            Integer color = sColorNameMap.get(colorString.toLowerCase(Locale.US));
             if (color != null) {
                 return color;
             }
         }
-        throw new IllegalArgumentException("Unknown color: " + colorString);
+        Log.e(TAG, "Unknown color: " + colorString);
+        throw new ParseException("Unknown color: " + colorString, 0);
     }
 
     private static final HashMap<String, Integer> sColorNameMap;
@@ -935,14 +944,14 @@ class HtmlToSpannedConverter implements ContentHandler {
         sColorNameMap = new HashMap<>();
         sColorNameMap.put("aliceblue", 0xFFF0F8FF);
         sColorNameMap.put("antiquewhite", 0xFFFAEBD7);
-        sColorNameMap.put("aqua", 0xFFFFFF);
+        sColorNameMap.put("aqua", 0xFF00FFFF);
         sColorNameMap.put("aquamarine", 0xFF7FFFD4);
         sColorNameMap.put("azure", 0xFFF0FFFF);
         sColorNameMap.put("beige", 0xFFF5F5DC);
         sColorNameMap.put("bisque", 0xFFFFE4C4);
-        sColorNameMap.put("black", 0xFF0);
+        sColorNameMap.put("black", 0xFF000000);
         sColorNameMap.put("blanchedalmond", 0xFFFFEBCD);
-        sColorNameMap.put("blue", 0xFFFF);
+        sColorNameMap.put("blue", 0xFF0000FF);
         sColorNameMap.put("blueviolet", 0xFF8A2BE2);
         sColorNameMap.put("brown", 0xFFA52A2A);
         sColorNameMap.put("burlywood", 0xFFDEB887);
@@ -953,12 +962,13 @@ class HtmlToSpannedConverter implements ContentHandler {
         sColorNameMap.put("cornflowerblue", 0xFF6495ED);
         sColorNameMap.put("cornsilk", 0xFFFFF8DC);
         sColorNameMap.put("crimson", 0xFFDC143C);
-        sColorNameMap.put("cyan", 0xFFFFFF);
-        sColorNameMap.put("darkblue", 0xFF8B);
-        sColorNameMap.put("darkcyan", 0xFF8B8B);
+        sColorNameMap.put("cyan", 0xFF00FFFF);
+        sColorNameMap.put("darkblue", 0xFF00008B);
+        sColorNameMap.put("darkcyan", 0xFF008B8B);
         sColorNameMap.put("darkgoldenrod", 0xFFB8860B);
         sColorNameMap.put("darkgray", 0xFFA9A9A9);
-        sColorNameMap.put("darkgreen", 0xFF6400);
+        sColorNameMap.put("darkgrey", 0xFFA9A9A9);
+        sColorNameMap.put("darkgreen", 0xFF006400);
         sColorNameMap.put("darkkhaki", 0xFFBDB76B);
         sColorNameMap.put("darkmagenta", 0xFF8B008B);
         sColorNameMap.put("darkolivegreen", 0xFF556B2F);
@@ -969,11 +979,13 @@ class HtmlToSpannedConverter implements ContentHandler {
         sColorNameMap.put("darkseagreen", 0xFF8FBC8F);
         sColorNameMap.put("darkslateblue", 0xFF483D8B);
         sColorNameMap.put("darkslategray", 0xFF2F4F4F);
-        sColorNameMap.put("darkturquoise", 0xFFCED1);
+        sColorNameMap.put("darkslategrey", 0xFF2F4F4F);
+        sColorNameMap.put("darkturquoise", 0xFF00CED1);
         sColorNameMap.put("darkviolet", 0xFF9400D3);
         sColorNameMap.put("deeppink", 0xFFFF1493);
-        sColorNameMap.put("deepskyblue", 0xFFBFFF);
+        sColorNameMap.put("deepskyblue", 0xFF00BFFF);
         sColorNameMap.put("dimgray", 0xFF696969);
+        sColorNameMap.put("dimgrey", 0xFF696969);
         sColorNameMap.put("dodgerblue", 0xFF1E90FF);
         sColorNameMap.put("firebrick", 0xFFB22222);
         sColorNameMap.put("floralwhite", 0xFFFFFAF0);
@@ -984,7 +996,8 @@ class HtmlToSpannedConverter implements ContentHandler {
         sColorNameMap.put("gold", 0xFFFFD700);
         sColorNameMap.put("goldenrod", 0xFFDAA520);
         sColorNameMap.put("gray", 0xFF808080);
-        sColorNameMap.put("green", 0xFF8000);
+        sColorNameMap.put("grey", 0xFF808080);
+        sColorNameMap.put("green", 0xFF008000);
         sColorNameMap.put("greenyellow", 0xFFADFF2F);
         sColorNameMap.put("honeydew", 0xFFF0FFF0);
         sColorNameMap.put("hotpink", 0xFFFF69B4);
@@ -1000,27 +1013,29 @@ class HtmlToSpannedConverter implements ContentHandler {
         sColorNameMap.put("lightcoral", 0xFFF08080);
         sColorNameMap.put("lightcyan", 0xFFE0FFFF);
         sColorNameMap.put("lightgoldenrodyellow", 0xFFFAFAD2);
-        sColorNameMap.put("lightgreen", 0xFF90EE90);
+        sColorNameMap.put("lightgray", 0xFFD3D3D3);
         sColorNameMap.put("lightgrey", 0xFFD3D3D3);
+        sColorNameMap.put("lightgreen", 0xFF90EE90);
         sColorNameMap.put("lightpink", 0xFFFFB6C1);
         sColorNameMap.put("lightsalmon", 0xFFFFA07A);
         sColorNameMap.put("lightseagreen", 0xFF20B2AA);
         sColorNameMap.put("lightskyblue", 0xFF87CEFA);
         sColorNameMap.put("lightslategray", 0xFF778899);
+        sColorNameMap.put("lightslategrey", 0xFF778899);
         sColorNameMap.put("lightsteelblue", 0xFFB0C4DE);
         sColorNameMap.put("lightyellow", 0xFFFFFFE0);
-        sColorNameMap.put("lime", 0xFFFF00);
+        sColorNameMap.put("lime", 0xFF00FF00);
         sColorNameMap.put("limegreen", 0xFF32CD32);
         sColorNameMap.put("linen", 0xFFFAF0E6);
         sColorNameMap.put("magenta", 0xFFFF00FF);
         sColorNameMap.put("maroon", 0xFF800000);
         sColorNameMap.put("mediumaquamarine", 0xFF66CDAA);
-        sColorNameMap.put("mediumblue", 0xFFCD);
+        sColorNameMap.put("mediumblue", 0xFF0000CD);
         sColorNameMap.put("mediumorchid", 0xFFBA55D3);
         sColorNameMap.put("mediumpurple", 0xFF9370DB);
         sColorNameMap.put("mediumseagreen", 0xFF3CB371);
         sColorNameMap.put("mediumslateblue", 0xFF7B68EE);
-        sColorNameMap.put("mediumspringgreen", 0xFFFA9A);
+        sColorNameMap.put("mediumspringgreen", 0xFF00FA9A);
         sColorNameMap.put("mediumturquoise", 0xFF48D1CC);
         sColorNameMap.put("mediumvioletred", 0xFFC71585);
         sColorNameMap.put("midnightblue", 0xFF191970);
@@ -1028,7 +1043,7 @@ class HtmlToSpannedConverter implements ContentHandler {
         sColorNameMap.put("mistyrose", 0xFFFFE4E1);
         sColorNameMap.put("moccasin", 0xFFFFE4B5);
         sColorNameMap.put("navajowhite", 0xFFFFDEAD);
-        sColorNameMap.put("navy", 0xFF80);
+        sColorNameMap.put("navy", 0xFF000080);
         sColorNameMap.put("oldlace", 0xFFFDF5E6);
         sColorNameMap.put("olive", 0xFF808000);
         sColorNameMap.put("olivedrab", 0xFF6B8E23);
@@ -1046,6 +1061,7 @@ class HtmlToSpannedConverter implements ContentHandler {
         sColorNameMap.put("plum", 0xFFDDA0DD);
         sColorNameMap.put("powderblue", 0xFFB0E0E6);
         sColorNameMap.put("purple", 0xFF800080);
+        sColorNameMap.put("rebeccapurple", 0xFF663399);
         sColorNameMap.put("red", 0xFFFF0000);
         sColorNameMap.put("rosybrown", 0xFFBC8F8F);
         sColorNameMap.put("royalblue", 0xFF4169E1);
@@ -1059,11 +1075,12 @@ class HtmlToSpannedConverter implements ContentHandler {
         sColorNameMap.put("skyblue", 0xFF87CEEB);
         sColorNameMap.put("slateblue", 0xFF6A5ACD);
         sColorNameMap.put("slategray", 0xFF708090);
+        sColorNameMap.put("slategrey", 0xFF708090);
         sColorNameMap.put("snow", 0xFFFFFAFA);
-        sColorNameMap.put("springgreen", 0xFFFF7F);
+        sColorNameMap.put("springgreen", 0xFF00FF7F);
         sColorNameMap.put("steelblue", 0xFF4682B4);
         sColorNameMap.put("tan", 0xFFD2B48C);
-        sColorNameMap.put("teal", 0xFF8080);
+        sColorNameMap.put("teal", 0xFF008080);
         sColorNameMap.put("thistle", 0xFFD8BFD8);
         sColorNameMap.put("tomato", 0xFFFF6347);
         sColorNameMap.put("turquoise", 0xFF40E0D0);

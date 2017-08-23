@@ -23,9 +23,13 @@ public class ACUrl {
 
     public static final String APP_ID = "nimingban";
 
-    public static final String HOST = "https://h.nimingban.com";
+    public static final String DOMAIN = "h.nimingban.com";
+
+    public static final String HOST = "https://" + DOMAIN;
 
     public static final String API_POST_LIST = HOST + "/Api/showf?appid=" + APP_ID;
+
+    public static final String API_TIME_LINE = HOST + "/Api/timeline?appid=" + APP_ID;
 
     public static final String API_POST = HOST + "/Api/thread?appid=" + APP_ID;
 
@@ -41,7 +45,8 @@ public class ACUrl {
 
     public static final String API_GET_COOKIE = HOST + "/Api/getCookie?appid=" + APP_ID;
 
-    public static final String API_GET_CDN_PATH = HOST + "/Api/getCdnPath?appid=" + APP_ID;
+    //public static final String API_GET_CDN_PATH = HOST + "/Api/getCdnPath?appid=" + APP_ID;
+    public static final String API_GET_CDN_PATH = "http://nimingban.herokuapp.com/get_image_cdn_path";
 
     public static final String API_GET_FORUM_LIST = HOST + "/Api/getForumList?appid=" + APP_ID;
 
@@ -51,8 +56,18 @@ public class ACUrl {
 
     public static final String API_SEARCH = HOST + "/Api/search?appid=" + APP_ID;
 
+    public static final String FORUM_ID_TIME_LINE = "-1";
+
     public static String getPostListUrl(String forum, int page) {
-        return API_POST_LIST + "&id=" + forum + "&page=" + (page + 1);
+        if (FORUM_ID_TIME_LINE.equals(forum)) {
+            return getTimeLineUrl(page);
+        } else {
+            return API_POST_LIST + "&id=" + forum + "&page=" + (page + 1);
+        }
+    }
+
+    public static String getTimeLineUrl(int page) {
+        return API_TIME_LINE + "&page=" + (page + 1);
     }
 
     public static String getPostUrl(String id, int page) {

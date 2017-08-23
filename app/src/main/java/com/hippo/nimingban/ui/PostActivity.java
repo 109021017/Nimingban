@@ -37,7 +37,7 @@ import com.hippo.nimingban.widget.PostLayout;
 import com.hippo.yorozuya.LayoutUtils;
 import com.hippo.yorozuya.ResourcesUtils;
 
-public final class PostActivity extends SwipeActivity
+public final class PostActivity extends SwipeBackActivity
         implements FragmentHost, PostFragment.Callback, TypeSendFragment.Callback {
 
     public static final String ACTION_POST = "com.hippo.nimingban.ui.PostActivity.action.POST";
@@ -93,7 +93,7 @@ public final class PostActivity extends SwipeActivity
                 postFragment.setCallback(this);
                 FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
                 transaction.add(R.id.fragment_container, postFragment, TAG_FRAGMENT_POST);
-                transaction.commit();
+                transaction.commitAllowingStateLoss();
             } else {
                 FragmentManager fragmentManager = getSupportFragmentManager();
                 PostFragment postFragment = (PostFragment) fragmentManager.findFragmentByTag(TAG_FRAGMENT_POST);
@@ -168,9 +168,9 @@ public final class PostActivity extends SwipeActivity
             FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
             transaction.setCustomAnimations(R.anim.fragment_translate_in, R.anim.fragment_translate_out);
             transaction.add(R.id.fragment_container, typeSendFragment, TAG_FRAGMENT_TYPE_SEND);
-            transaction.commit();
+            transaction.commitAllowingStateLoss();
 
-            setSwipeBackEnable(false);
+            getSwipeBackLayout().setSwipeEnabled(false);
         }
     }
 
@@ -192,9 +192,9 @@ public final class PostActivity extends SwipeActivity
             FragmentTransaction transaction = fragmentManager.beginTransaction();
             transaction.setCustomAnimations(R.anim.fragment_translate_in, R.anim.fragment_translate_out);
             transaction.remove(fragment);
-            transaction.commit();
+            transaction.commitAllowingStateLoss();
 
-            setSwipeBackEnable(true);
+            getSwipeBackLayout().setSwipeEnabled(true);
 
             mPostLayout.onRemoveTypeSend();
         }

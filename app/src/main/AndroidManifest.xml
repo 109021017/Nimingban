@@ -171,15 +171,23 @@
             android:configChanges="screenSize|uiMode|orientation"
             android:screenOrientation="unspecified"/>
 
-        <receiver
-            android:name="com.hippo.nimingban.receiver.NetworkReceiver"
-            android:label="@string/network_receiver">
+        <provider
+          android:name="com.hippo.nimingban.content.UniversalProvider"
+          android:authorities="com.hippo.nimingban.universal"
+          android:grantUriPermissions="true"
+          android:exported="false"/>
 
-            <intent-filter>
-                <action android:name="android.net.conn.CONNECTIVITY_CHANGE"/>
-            </intent-filter>
+        <provider
+            android:name="com.hippo.nimingban.content.ImageProvider"
+            android:authorities="com.hippo.nimingban.image"
+            android:grantUriPermissions="true"
+            android:exported="false"/>
 
-        </receiver>
+        <provider
+            android:name="com.hippo.nimingban.content.UpdateApkProvider"
+            android:authorities="com.hippo.nimingban.updateapk"
+            android:grantUriPermissions="true"
+            android:exported="true"/>
 
         <service
             android:name="com.hippo.nimingban.service.DaDiaoService"
@@ -188,6 +196,10 @@
 
         <meta-data android:name="TD_APP_ID" android:value="B8168DD03CD9EF62B476CEDFBC3FB52D"/>
         <meta-data android:name="TD_CHANNEL_ID" android:value="nimingban"/>
+
+        <meta-data android:name="com.samsung.android.sdk.multiwindow.enable" android:value="true" />
+        <meta-data android:name="com.samsung.android.sdk.multiwindow.multiinstance.enable" android:value="true" />
+        <meta-data android:name="com.samsung.android.sdk.multiwindow.penwindow.enable" android:value="true" />
 
     </application>
 

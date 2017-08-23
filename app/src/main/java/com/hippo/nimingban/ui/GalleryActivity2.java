@@ -41,11 +41,14 @@ import com.hippo.conaco.ProgressNotify;
 import com.hippo.drawable.ImageDrawable;
 import com.hippo.drawable.ImageWrapper;
 import com.hippo.io.UniFileInputStreamPipe;
+import com.hippo.nimingban.ImageSearch;
 import com.hippo.nimingban.NMBAppConfig;
 import com.hippo.nimingban.NMBApplication;
 import com.hippo.nimingban.R;
 import com.hippo.nimingban.client.data.Site;
+import com.hippo.nimingban.content.ImageProvider;
 import com.hippo.nimingban.util.BitmapUtils;
+import com.hippo.nimingban.util.OpenUrlHelper;
 import com.hippo.nimingban.util.Settings;
 import com.hippo.nimingban.widget.GalleryPage;
 import com.hippo.unifile.UniFile;
@@ -64,7 +67,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 // TODO show all image in post
-public class GalleryActivity2 extends SwipeActivity {
+public class GalleryActivity2 extends SwipeBackActivity {
 
     public static final String[] IMAGE_EXTENSIONS = {
             "jpg",
@@ -166,12 +169,19 @@ public class GalleryActivity2 extends SwipeActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.activity_gallery_2, menu);
+
+        if (mGalleryAdapter instanceof ImageFileAdapter) {
+            menu.removeItem(R.id.action_refresh);
+            menu.removeItem(R.id.action_search);
+        }
+
         return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
+        final int id = item.getItemId();
+        switch (id) {
             case android.R.id.home:
                 finish();
                 return true;
@@ -188,6 +198,22 @@ public class GalleryActivity2 extends SwipeActivity {
             case R.id.action_refresh:
                 if (mSaveTask == null) {
                     mGalleryAdapter.reloadCurrentImage();
+                }
+                return true;
+            case R.id.action_search_google:
+            case R.id.action_search_baidu:
+            case R.id.action_search_sogou:
+            case R.id.action_search_tineye:
+            case R.id.action_search_whatanime:
+            case R.id.action_search_saucenao:
+            case R.id.action_search_iqdb:
+            case R.id.action_search_iqdb_3d:
+                if (mGalleryAdapter instanceof SingleImageAdapter) {
+                    String url = ImageSearch.getImageSearchUrl(id,
+                            ((SingleImageAdapter) mGalleryAdapter).getCurrentImageUrl());
+                    if (url != null) {
+                        OpenUrlHelper.openUrl(this, url, false);
+                    }
                 }
                 return true;
             default:
@@ -218,7 +244,7 @@ public class GalleryActivity2 extends SwipeActivity {
                 }
                 Intent intent = new Intent();
                 intent.setAction(Intent.ACTION_SEND);
-                intent.putExtra(Intent.EXTRA_STREAM, uri);
+                intent.putExtra(Intent.EXTRA_STREAM, ImageProvider.buildUri(uri.getLastPathSegment()));
                 intent.setType(mimeType);
                 startActivity(Intent.createChooser(intent, getString(R.string.share_image)));
             }
@@ -347,6 +373,10 @@ public class GalleryActivity2 extends SwipeActivity {
         @Override
         public int getCount() {
             return 1;
+        }
+
+        public String getCurrentImageUrl() {
+            return mImage;
         }
 
         @Override

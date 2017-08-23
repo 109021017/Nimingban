@@ -44,6 +44,10 @@
     <color name="pure_inverse_light">@color/pure_dark</color>
     <color name="pure_inverse_dark">@color/pure_light</color>
 
+    <color name="colorPrimary">@color/purple_500</color>
+    <color name="colorPrimaryDark">@color/purple_700</color>
+    <color name="colorAccent">@color/green_ntr</color>
+
     <color name="red_500">#fff44336</color>
     <color name="pink_500">#ffe91e63</color>
     <color name="purple_500">#ff9c27b0</color>
@@ -89,6 +93,9 @@
 
     <color name="round_side_light">#ffececec</color>
     <color name="round_side_dark">#ff3e3e3e</color>
+
+    <color name="background_light">#fffafafa</color>
+    <color name="background_dark">#ff303030</color>
 
     <color name="keyboard_background_light">#ffeceff1</color>
     <color name="keyboard_background_dark">#ff263238</color>

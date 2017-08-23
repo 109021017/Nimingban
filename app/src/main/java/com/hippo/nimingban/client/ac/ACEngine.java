@@ -18,6 +18,7 @@ package com.hippo.nimingban.client.ac;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.Build;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
@@ -55,6 +56,7 @@ import org.jsoup.nodes.Element;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -73,7 +75,8 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
-public class ACEngine {
+public final class ACEngine {
+    private ACEngine() {}
 
     private static final String TAG = ACEngine.class.getSimpleName();
 
@@ -122,7 +125,7 @@ public class ACEngine {
     public static Call prepareGetCookie(OkHttpClient okHttpClient) {
         String url = ACUrl.API_GET_COOKIE;
         Log.d(TAG, url);
-        Request request = new ACRequestBuilder(url).build();
+        Request request = new Request.Builder().url(url).build();
         return okHttpClient.newCall(request);
     }
 
@@ -146,7 +149,7 @@ public class ACEngine {
     public static Call prepareGetCdnPath(OkHttpClient okHttpClient) {
         String url = ACUrl.API_GET_CDN_PATH;
         Log.d(TAG, url);
-        Request request = new ACRequestBuilder(url).build();
+        Request request = new Request.Builder().url(url).build();
         return okHttpClient.newCall(request);
     }
 
@@ -165,7 +168,7 @@ public class ACEngine {
     public static Call prepareGetCommonPosts(OkHttpClient okHttpClient) {
         String url = ACUrl.API_COMMON_POSTS;
         Log.d(TAG, url);
-        Request request = new ACRequestBuilder(url).build();
+        Request request = new Request.Builder().url(url).build();
         return okHttpClient.newCall(request);
     }
 
@@ -189,7 +192,7 @@ public class ACEngine {
     public static Call prepareGetForumList(OkHttpClient okHttpClient) {
         String url = ACUrl.API_GET_FORUM_LIST;
         Log.d(TAG, url);
-        Request request = new ACRequestBuilder(url).build();
+        Request request = new Request.Builder().url(url).build();
         return okHttpClient.newCall(request);
     }
 
@@ -213,7 +216,7 @@ public class ACEngine {
     public static Call prepareGetPostList(OkHttpClient okHttpClient, String id, int page) {
         String url = ACUrl.getPostListUrl(id, page);
         Log.d(TAG, url);
-        Request request = new ACRequestBuilder(url).build();
+        Request request = new Request.Builder().url(url).build();
         return okHttpClient.newCall(request);
     }
 
@@ -245,7 +248,7 @@ public class ACEngine {
     public static Call prepareGetPost(OkHttpClient okHttpClient, String id, int page) {
         String url = ACUrl.getPostUrl(id, page);
         Log.d(TAG, url);
-        Request request = new ACRequestBuilder(url).build();
+        Request request = new Request.Builder().url(url).build();
         return okHttpClient.newCall(request);
     }
 
@@ -269,7 +272,7 @@ public class ACEngine {
     public static Call prepareGetReference(OkHttpClient okHttpClient, String id) {
         String url = ACUrl.getReferenceUrl(id);
         Log.d(TAG, url);
-        Request request = new ACRequestBuilder(url).build();
+        Request request = new Request.Builder().url(url).build();
         return okHttpClient.newCall(request);
     }
 
@@ -352,45 +355,43 @@ public class ACEngine {
                     Headers.of("Content-Disposition", "form-data; name=\"water\""),
                     RequestBody.create(null, "true"));
         }
-        InputStreamPipe isPipe = struct.image;
 
-        if (isPipe != null) {
-            String filename;
-            MediaType mediaType;
-            byte[] bytes;
-            File file = compressBitmap(isPipe, struct.imageType);
+        if (struct.image != null) {
+            final byte[] bytes;
+            File file = compressBitmap(struct.image, struct.imageType);
+
+            final String imageType;
+            final InputStreamPipe imagePipe;
             if (file == null) {
-                String extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(struct.imageType);
-                if (TextUtils.isEmpty(extension)) {
-                    extension = "jpg";
-                }
-                filename = "a." + extension;
-
-                mediaType = MediaType.parse(struct.imageType);
-                if (mediaType == null) {
-                    mediaType = MEDIA_TYPE_IMAGE_ALL;
-                }
-
-                try {
-                    isPipe.obtain();
-                    bytes = IOUtils.getAllByte(isPipe.open());
-                } finally {
-                    isPipe.close();
-                    isPipe.release();
-                }
+                // Origin image
+                imageType = struct.imageType;
+                imagePipe = struct.image;
             } else {
-                filename = "a.jpg";
-                mediaType = MEDIA_TYPE_IMAGE_JPEG;
-
-                InputStream is = null;
-                try {
-                    is = new FileInputStream(file);
-                    bytes = IOUtils.getAllByte(is);
-                } finally {
-                    IOUtils.closeQuietly(is);
-                    file.delete();
-                }
+                // Compressed image
+                // gif or jpeg
+                imageType = "image/gif".equals(struct.imageType) ? "image/gif" : "image/jpeg";
+                imagePipe = new FileInputStreamPipe(file);
             }
+
+            String extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(imageType);
+            if (TextUtils.isEmpty(extension)) {
+                extension = "jpg";
+            }
+            final String filename = "a." + extension;
+
+            MediaType mediaType = MediaType.parse(imageType);
+            if (mediaType == null) {
+                mediaType = MEDIA_TYPE_IMAGE_ALL;
+            }
+
+            try {
+                imagePipe.obtain();
+                bytes = IOUtils.getAllByte(imagePipe.open());
+            } finally {
+                imagePipe.close();
+                imagePipe.release();
+            }
+
             builder.addPart(
                     Headers.of("Content-Disposition", "form-data; name=\"image\"; filename=\"" + filename + "\""),
                     RequestBody.create(mediaType, bytes));
@@ -398,7 +399,8 @@ public class ACEngine {
 
         String url = ACUrl.API_REPLY;
         Log.d(TAG, url);
-        Request request = new ACRequestBuilder(url)
+        Request request = new Request.Builder()
+                .url(url)
                 .post(builder.build())
                 .build();
         return okHttpClient.newCall(request);
@@ -433,7 +435,7 @@ public class ACEngine {
     public static Call prepareGetFeed(OkHttpClient okHttpClient, String uuid, int page) {
         String url = ACUrl.getFeedUrl(uuid, page);
         Log.d(TAG, url);
-        Request request = new ACRequestBuilder(url).build();
+        Request request = new Request.Builder().url(url).build();
         return okHttpClient.newCall(request);
     }
 
@@ -467,7 +469,7 @@ public class ACEngine {
     public static Call prepareAddFeed(OkHttpClient okHttpClient, String uuid, String tid) {
         String url = ACUrl.getAddFeedUrl(uuid, tid);
         Log.d(TAG, url);
-        Request request = new ACRequestBuilder(url).build();
+        Request request = new Request.Builder().url(url).build();
         return okHttpClient.newCall(request);
     }
 
@@ -491,7 +493,7 @@ public class ACEngine {
     public static Call prepareDelFeed(OkHttpClient okHttpClient, String uuid, String tid) {
         String url = ACUrl.getDelFeedUrl(uuid, tid);
         Log.d(TAG, url);
-        Request request = new ACRequestBuilder(url).build();
+        Request request = new Request.Builder().url(url).build();
         return okHttpClient.newCall(request);
     }
 
@@ -535,45 +537,43 @@ public class ACEngine {
                     Headers.of("Content-Disposition", "form-data; name=\"water\""),
                     RequestBody.create(null, "true"));
         }
-        InputStreamPipe isPipe = struct.image;
 
-        if (isPipe != null) {
-            String filename;
-            MediaType mediaType;
-            byte[] bytes;
-            File file = compressBitmap(isPipe, struct.imageType);
+        if (struct.image != null) {
+            final byte[] bytes;
+            File file = compressBitmap(struct.image, struct.imageType);
+
+            final String imageType;
+            final InputStreamPipe imagePipe;
             if (file == null) {
-                String extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(struct.imageType);
-                if (TextUtils.isEmpty(extension)) {
-                    extension = "jpg";
-                }
-                filename = "a." + extension;
-
-                mediaType = MediaType.parse(struct.imageType);
-                if (mediaType == null) {
-                    mediaType = MEDIA_TYPE_IMAGE_ALL;
-                }
-
-                try {
-                    isPipe.obtain();
-                    bytes = IOUtils.getAllByte(isPipe.open());
-                } finally {
-                    isPipe.close();
-                    isPipe.release();
-                }
+                // Origin image
+                imageType = struct.imageType;
+                imagePipe = struct.image;
             } else {
-                filename = "a.jpg";
-                mediaType = MEDIA_TYPE_IMAGE_JPEG;
-
-                InputStream is = null;
-                try {
-                    is = new FileInputStream(file);
-                    bytes = IOUtils.getAllByte(is);
-                } finally {
-                    IOUtils.closeQuietly(is);
-                    file.delete();
-                }
+                // Compressed image
+                // gif or jpeg
+                imageType = "image/gif".equals(struct.imageType) ? "image/gif" : "image/jpeg";
+                imagePipe = new FileInputStreamPipe(file);
             }
+
+            String extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(imageType);
+            if (TextUtils.isEmpty(extension)) {
+                extension = "jpg";
+            }
+            final String filename = "a." + extension;
+
+            MediaType mediaType = MediaType.parse(imageType);
+            if (mediaType == null) {
+                mediaType = MEDIA_TYPE_IMAGE_ALL;
+            }
+
+            try {
+                imagePipe.obtain();
+                bytes = IOUtils.getAllByte(imagePipe.open());
+            } finally {
+                imagePipe.close();
+                imagePipe.release();
+            }
+
             builder.addPart(
                     Headers.of("Content-Disposition", "form-data; name=\"image\"; filename=\"" + filename + "\""),
                     RequestBody.create(mediaType, bytes));
@@ -581,7 +581,8 @@ public class ACEngine {
 
         String url = ACUrl.API_CREATE_POST;
         Log.d(TAG, url);
-        Request request = new ACRequestBuilder(url)
+        Request request = new Request.Builder()
+                .url(url)
                 .post(builder.build())
                 .build();
         return okHttpClient.newCall(request);
@@ -615,17 +616,46 @@ public class ACEngine {
 
     private static final long MAX_IMAGE_SIZE = 2000 * 1024;
 
-    private static boolean compressGifSicle(File input, File output) throws IOException {
-        File gifsicle = new File(NMBAppConfig.getNativeLibDir(), "libgifsicle-executable.so");
+    private static int getBitmapWidth(File file) {
+        InputStream is = null;
+        try {
+            is = new FileInputStream(file);
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inJustDecodeBounds = true;
+            BitmapFactory.decodeStream(is, null, options);
+            return options.outWidth;
+        } catch (FileNotFoundException e) {
+            return 0;
+        } finally {
+            IOUtils.closeQuietly(is);
+        }
+    }
+
+    private static boolean compressGifsicle(File input, File output) throws IOException {
+        final String gifsicleFilename;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            gifsicleFilename = "libgifsicle_executable.so";
+        } else {
+            gifsicleFilename = "libgifsicle_executable_legacy.so";
+        }
+
+        final File gifsicle = new File(NMBAppConfig.getNativeLibDir(), gifsicleFilename);
         if (!gifsicle.canExecute()) {
             return false;
         }
 
         float scale = (float) Math.sqrt((float) MAX_IMAGE_SIZE / (float) input.length());
-        for (int i = 0; i < 5 && scale > 0.0001; i++) {
-            String cmd = String.format(Locale.US, "%s --scale %f --output %s %s",
-                    gifsicle.getPath(), scale, output.getPath(), input.getPath());
-            Process process = Runtime.getRuntime().exec(cmd);
+        int width = (int) (getBitmapWidth(input) * scale);
+        if (width <= 0) {
+            return false;
+        }
+
+        final int offset = width / 5;
+        for (int i = 0; i < 5 && width > 0; i++, width -= offset) {
+            String cmd = String.format(Locale.US, "%s --resize-width %d --output %s %s",
+                    gifsicle.getPath(), width, output.getPath(), input.getPath());
+            String[] envp = { "LD_LIBRARY_PATH=" + NMBAppConfig.getNativeLibDir() };
+            Process process = Runtime.getRuntime().exec(cmd, envp);
             try {
                 if (process.waitFor() != 0) {
                     return false;
@@ -637,7 +667,6 @@ public class ACEngine {
                 e.printStackTrace();
                 return false;
             }
-            scale -= 0.05;
         }
         return false;
     }
@@ -661,7 +690,7 @@ public class ACEngine {
             os.close();
 
             long size = temp.length();
-            if (size < MAX_IMAGE_SIZE && !"image/jpeg".equals(imageType) && !"image/jpg".equals(imageType)) {
+            if (size < MAX_IMAGE_SIZE) {
                 temp.delete();
                 return null;
             }
@@ -672,8 +701,7 @@ public class ACEngine {
                     throw new NMBException(DumpSite.getInstance(), "Can't create temp file");
                 }
 
-                if (compressGifSicle(temp, output)) {
-                    Log.d("TAG", "compressGifSicle ok");
+                if (compressGifsicle(temp, output)) {
                     return output;
                 } else {
                     throw new NMBException(DumpSite.getInstance(), "Can't compress gif");
@@ -726,7 +754,7 @@ public class ACEngine {
     public static Call prepareSearch(OkHttpClient okHttpClient, String keyword, int page) throws UnsupportedEncodingException {
         String url = ACUrl.getSearchUrl(keyword, page);
         Log.d(TAG, url);
-        Request request = new ACRequestBuilder(url).build();
+        Request request = new Request.Builder().url(url).build();
         return okHttpClient.newCall(request);
     }
 
